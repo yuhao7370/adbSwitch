@@ -31,6 +31,7 @@ final class LinkagePrefs {
     static final String KEY_APPS = "linkage_pkgs";
     static final String KEY_DEFAULT = "linkage_default";
     static final String KEY_LEGACY_PKG = "linkage_pkg";
+    private static final String KEY_REAR_APPS = "rear_display_pkgs";
 
     private LinkagePrefs() {
     }
@@ -69,6 +70,9 @@ final class LinkagePrefs {
             a.put(p);
         }
         sp(c).edit().putString(KEY_APPS, a.toString()).apply();
+        Set<String> rearApps = new LinkedHashSet<>(sp(c).getStringSet(KEY_REAR_APPS, java.util.Collections.emptySet()));
+        rearApps.retainAll(set);
+        sp(c).edit().putStringSet(KEY_REAR_APPS, rearApps).apply();
         // 默认 app 必须仍存在于列表中，否则联动自动跳转会找不到目标
         String def = getDefault(c);
         if (!def.isEmpty() && !set.contains(def)) {
@@ -93,6 +97,16 @@ final class LinkagePrefs {
 
     static void setDefault(Context c, String pkg) {
         sp(c).edit().putString(KEY_DEFAULT, pkg == null ? "" : pkg).apply();
+    }
+
+    static boolean closesRearDisplay(Context c, String pkg) {
+        return sp(c).getStringSet(KEY_REAR_APPS, java.util.Collections.emptySet()).contains(pkg);
+    }
+
+    static void setClosesRearDisplay(Context c, String pkg, boolean enabled) {
+        Set<String> packages = new LinkedHashSet<>(sp(c).getStringSet(KEY_REAR_APPS, java.util.Collections.emptySet()));
+        if (enabled) packages.add(pkg); else packages.remove(pkg);
+        sp(c).edit().putStringSet(KEY_REAR_APPS, packages).apply();
     }
 
     /**

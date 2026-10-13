@@ -30,11 +30,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.elleng.adbswitch"
+        applicationId = "com.yuhao7370.adbswitch"
         minSdk = 27
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.1.0-yuhao"
         buildConfigField("long", "BUILD_TIME_MS", "${buildTimeMs}L")
 
         // 蒲公英备通道密钥：从仓库外 pgyer.properties 注入 BuildConfig，避免明文进源码/公开仓库。
@@ -103,6 +103,7 @@ android {
 // 主开关的真实写入走双后端：root（su）或 Shizuku（shell uid 2000）。
 // Shizuku 的三个工件（api / provider / aidl）13.1.5 已在本机 Gradle 缓存，可离线构建。
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("dev.rikka.shizuku:aidl:13.1.5")

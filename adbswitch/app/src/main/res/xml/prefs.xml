@@ -60,6 +60,14 @@
             android:layout="@layout/pref_row" 
             app:iconSpaceReserved="false" />
 
+        <Preference
+            android:key="restoreRearDisplay"
+            android:order="50"
+            android:title="@string/rear_restore_only"
+            android:summary="@string/rear_restore_summary"
+            android:layout="@layout/pref_row"
+            app:iconSpaceReserved="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

@@ -8,7 +8,7 @@ import com.elleng.adbswitch.BuildConfig;
  * 双通道策略（GitHub 主 + 蒲公英备），编排与降级见 {@link UpdateChecker}。
  *
  * 配置来源：
- *  - 总开关 {@link #ENABLED}：构建时固定为 true。仅当它为真、且至少一条通道配置就绪时，
+ *  - 总开关 {@link #ENABLED}：个人维护版暂时设为 false。仅当它为真、且至少一条通道配置就绪时，
  *    {@link UpdateChecker#isActive()} 才返回 true、才会发请求（避免空配置误触发）。
  *  - 蒲公英密钥 {@link #PGYER_API_KEY} / {@link #PGYER_APP_KEY}：经 {@code BuildConfig}
  *    在构建时由仓库外的 {@code adbswitch/pgyer.properties} 注入，**不进源码、不进公开仓库**
@@ -30,14 +30,14 @@ public final class UpdateConfig {
     }
 
     /** 总开关。true 时由 isActive() 据通道配置决定是否真的发请求。 */
-    public static final boolean ENABLED = true;
+    public static final boolean ENABLED = false;
 
     // —— GitHub 通道：拉自维护的 update.json ——
     // raw 直链对公开仓可用（私有仓返回 404）。本仓库为公开分发仓，仅含 update/ 元数据，不含源码。
     public static final String GITHUB_UPDATE_JSON_URL =
-            "https://raw.githubusercontent.com/gaoyilun/adbSwitch/main/update/update.json";
+            "https://raw.githubusercontent.com/yuhao7370/adbSwitch/main/update/update.json";
     // GitHub Releases 落地页（含完整 APK 下载）。
-    public static final String GITHUB_RELEASES_URL = "https://github.com/gaoyilun/adbSwitch/releases";
+    public static final String GITHUB_RELEASES_URL = "https://github.com/yuhao7370/adbSwitch/releases";
 
     // —— 蒲公英通道 ——
     // 检测接口：POST https://www.pgyer.com/apiv2/app/check（固定公开地址，无密钥）

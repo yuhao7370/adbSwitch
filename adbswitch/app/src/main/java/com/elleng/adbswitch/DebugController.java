@@ -340,7 +340,7 @@ public final class DebugController {
     // —— 写（底层，仅本类内部调用）——
 
     /** 按当前授权模式选执行通道：Shizuku 走 shell(uid 2000)，否则走 su。 */
-    private static RootUtil.Result runPrivileged(Context ctx, String cmd) {
+    static RootUtil.Result runPrivileged(Context ctx, String cmd) {
         boolean shizuku = AuthManager.getMode(ctx) == AuthManager.Mode.SHIZUKU;
         RootUtil.Result r = shizuku ? ShizukuUtil.run(cmd) : RootUtil.su(cmd);
         // Log.d：release 默认不可见；排查授权/写入问题时 adb setprop log.tag.DebugController DEBUG 可开
@@ -359,6 +359,49 @@ public final class DebugController {
 
     private static final Executor IO = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    static void executeSerial(Runnable action) { IO.execute(action); }
+
+    static void publishState(Context context) { broadcast(context.getApplicationContext()); }
+
+    public interface LaunchCallback {
+        void onResult(boolean ok, State after, String error);
+    }
+
+    /** Close debugging, prepare the display, and launch before releasing the serial IO queue. */
+    public static void quickLaunch(Context context, String packageName, Intent launch, LaunchCallback callback) {
+        Context app = context.getApplicationContext();
+        Intent target = new Intent(launch).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        IO.execute(() -> {
+            QuickLaunchTransaction.Result result = QuickLaunchTransaction.run(new QuickLaunchTransaction.Operations() {
+                public State readDebug() { return readViaPrivileged(app); }
+                public State closeDebug() throws Exception {
+                    MasterMerge merge = masterMergeWrite(app, false);
+                    if (!merge.wrote) throw new IllegalStateException("调试关闭失败，已取消启动");
+                    return merge.after;
+                }
+                public void remember(State before) { save(app, before); }
+                public void prepareRear() throws Exception { RearDisplayController.prepareBlocking(app, packageName); }
+                public void launch() { app.startActivity(target); }
+                public void restoreRear() throws Exception { RearDisplayController.restoreBlocking(app); }
+                public State restoreDebug(State before) throws Exception {
+                    return writeDebugState(app, before).after;
+                }
+            });
+            State confirmed = commitAfter(app, result.after);
+            MAIN.post(() -> {
+                RearDisplayController.notifyChanged(app);
+                callback.onResult(result.error == null, confirmed, result.error);
+            });
+        });
+    }
+
+    private static WriteResult writeDebugState(Context app, State state) throws Exception {
+        if (state.anyOn()) RearDisplayController.stopTargetBeforeDebugOpen(app);
+        return writeKeyReadback(app, null,
+                "settings put global " + KEY_USB + " " + (state.usb ? 1 : 0)
+                        + "; settings put global " + KEY_WIRELESS + " " + (state.wireless ? 1 : 0));
+    }
 
     /**
      * 单线程执行器 + 同键去重合并：同一操作键（usb/wireless/dev/master）在途时，
@@ -448,6 +491,7 @@ public final class DebugController {
 
     /** 主开关写入核心：单次 shell 完成「读前态 → 杀联动应用 → 写入 → 回读后态」 */
     private static void setMasterBlocking(Context app, boolean on, ResultCallback cb) {
+        if (!prepareDebugOpen(app, on, cb)) return;
         MasterMerge m = masterMergeWrite(app, on);
         // 写入或回读失败（未授权 / 通道挂起 / ROM 拦截）：**绝不提交**。
         // 曾有的严重缺陷：after 兜底成 new State(false,false,false) 并无条件进 cache + persistLast，
@@ -467,6 +511,7 @@ public final class DebugController {
         if (!on && m.before != null && m.before.anyOn()) {
             save(app, m.before);
         }
+        if (on && m.after.anyOn()) restoreRearAfterDebugOpen(app);
         State s = commitAfter(app, m.after);
         if (cb != null) {
             MAIN.post(() -> cb.onResult(m.wrote, s));
@@ -533,6 +578,11 @@ public final class DebugController {
         if (after != null) {
             cache = new Snapshot(after, android.os.SystemClock.uptimeMillis());
             persistLast(app, after);
+        } else {
+            Snapshot old = cache;
+            if (old != null) cache = new Snapshot(old.state, 0);
+            confirmedThisSession = false;
+            lastRefreshReqAt = 0;
         }
         return broadcast(app);
     }
@@ -574,7 +624,7 @@ public final class DebugController {
     // —— 统一的 set / toggle 模板（原六个方法同构，现由下面两个底层原语 + enqueue 收口）——
 
     /** 子开关写完的统一收尾：回读失败拒绝提交（与主开关同规则），成功则提交并广播 */
-    private static void finishSubWrite(Context app, WriteResult w, ResultCallback cb) {
+    private static void finishSubWrite(Context app, WriteResult w, boolean openingDebug, ResultCallback cb) {
         if (w.after == null) {
             // 写入或回读失败（未授权 / 通道挂起 / ROM 拦截）：绝不提交假状态
             State last = read(app);
@@ -585,9 +635,27 @@ public final class DebugController {
             }
             return;
         }
+        if (openingDebug && w.after.anyOn()) restoreRearAfterDebugOpen(app);
         State s = commitAfter(app, w.after);
         if (cb != null) {
             MAIN.post(() -> cb.onResult(w.ok, s));
+        }
+    }
+
+    private static void restoreRearAfterDebugOpen(Context app) {
+        try { RearDisplayController.restoreBlocking(app); }
+        catch (Exception error) { RearDisplayController.reportRecoveryFailure(app, error); }
+    }
+
+    private static boolean prepareDebugOpen(Context app, boolean opening, ResultCallback callback) {
+        if (!opening) return true;
+        try {
+            RearDisplayController.stopTargetBeforeDebugOpen(app);
+            return true;
+        } catch (Exception error) {
+            RearDisplayController.reportRecoveryFailure(app, error);
+            failWithoutWrite(app, callback);
+            return false;
         }
     }
 
@@ -595,9 +663,10 @@ public final class DebugController {
     public static void setUsb(Context ctx, final boolean on, final ResultCallback cb) {
         final Context app = ctx.getApplicationContext();
         enqueue("usb", () -> {
+            if (!prepareDebugOpen(app, on, cb)) return;
             WriteResult w = writeKeyReadback(app, killScriptFor(app, on),
                     "settings put global " + KEY_USB + " " + (on ? "1" : "0"));
-            finishSubWrite(app, w, cb);
+            finishSubWrite(app, w, on, cb);
         });
     }
 
@@ -611,9 +680,10 @@ public final class DebugController {
                 return;
             }
             boolean on = !cur.usb;
+            if (!prepareDebugOpen(app, on, cb)) return;
             WriteResult w = writeKeyReadback(app, killScriptFor(app, on),
                     "settings put global " + KEY_USB + " " + (on ? "1" : "0"));
-            finishSubWrite(app, w, cb);
+            finishSubWrite(app, w, on, cb);
         });
     }
 
@@ -621,9 +691,10 @@ public final class DebugController {
     public static void setWireless(Context ctx, final boolean on, final ResultCallback cb) {
         final Context app = ctx.getApplicationContext();
         enqueue("wireless", () -> {
+            if (!prepareDebugOpen(app, on, cb)) return;
             WriteResult w = writeKeyReadback(app, killScriptFor(app, on),
                     "settings put global " + KEY_WIRELESS + " " + (on ? "1" : "0"));
-            finishSubWrite(app, w, cb);
+            finishSubWrite(app, w, on, cb);
         });
     }
 
@@ -637,9 +708,10 @@ public final class DebugController {
                 return;
             }
             boolean on = !cur.wireless;
+            if (!prepareDebugOpen(app, on, cb)) return;
             WriteResult w = writeKeyReadback(app, killScriptFor(app, on),
                     "settings put global " + KEY_WIRELESS + " " + (on ? "1" : "0"));
-            finishSubWrite(app, w, cb);
+            finishSubWrite(app, w, on, cb);
         });
     }
 
@@ -653,7 +725,7 @@ public final class DebugController {
         enqueue("dev", () -> {
             WriteResult w = writeKeyReadback(app, null,
                     "settings put global " + KEY_DEV + " " + (on ? "1" : "0"));
-            finishSubWrite(app, w, cb);
+            finishSubWrite(app, w, false, cb);
         });
     }
 

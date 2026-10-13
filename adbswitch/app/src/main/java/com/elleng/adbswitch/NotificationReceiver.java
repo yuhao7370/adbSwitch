@@ -32,7 +32,14 @@ public class NotificationReceiver extends BroadcastReceiver {
         final Runnable forceFinish = () -> finishQuietly(pr);
         MAIN.postDelayed(forceFinish, FINISH_TIMEOUT_MS);
         String action = intent.getAction();
-        if (AdbToggleService.ACTION_OPEN.equals(action)) {
+        if (AdbToggleService.ACTION_RESTORE_REAR.equals(action)) {
+            RearDisplayController.restore(ctx, (ok, error) -> {
+                Toast.makeText(ctx, ok ? ctx.getString(R.string.rear_restored)
+                        : ctx.getString(R.string.rear_restore_failed, error), Toast.LENGTH_LONG).show();
+                MAIN.removeCallbacks(forceFinish);
+                finishQuietly(pr);
+            });
+        } else if (AdbToggleService.ACTION_OPEN.equals(action)) {
             DebugController.setMaster(ctx, true, (ok, s) -> {
                 // 写入失败必须让用户知道：只改通知会留下「点了没反应」的错觉
                 if (!ok) {

@@ -53,6 +53,9 @@ import com.elleng.adbswitch.update.UpdateInfo;
 import rikka.shizuku.Shizuku;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.snackbar.Snackbar;
 
 /**
@@ -111,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
     /** 「关于」行：点击弹窗展示版本/构建时间/授权模式（原「构建时间」行） */
     private Preference buildInfoPref;
     private Preference authPref;              // 授权模式（root / Shizuku）与授权状态合并项
+    private Preference rearRestorePref;
 
     private boolean syncing = false;          // 防止 setChecked 触发回环
     /** 当前授权模式是否可用（即能否真实写入调试开关）。乐观假定可用，后台双检测纠正 */
@@ -140,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** 关于弹窗外链：署名按钮 → elleng.eu.org；信息图标 → 项目仓库 */
     private static final String ABOUT_CREDIT_URL = "https://elleng.eu.org";
-    private static final String ABOUT_REPO_URL = "https://github.com/gaoyilun/AdbSwitch";
+    private static final String ABOUT_REPO_URL = "https://github.com/yuhao7370/adbSwitch";
 
     /** 状态变化 listener（替代原进程内广播）：任何写入/校准后刷新界面 */
     private final DebugController.StateListener stateListener = s -> {
@@ -265,6 +269,15 @@ public class MainActivity extends AppCompatActivity {
      */
     private boolean handleEntry(Intent in) {
         SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+
+        if (RearDisplayController.recoverOnFirstOpen(this)) {
+            sLinkageLaunched = true;
+            RearDisplayController.restore(this, (ok, error) -> {
+                Toast.makeText(getApplicationContext(), ok ? getString(R.string.rear_restored)
+                        : getString(R.string.rear_restore_failed, error), Toast.LENGTH_LONG).show();
+            });
+            return false; // Recovery takes priority over automatic/shortcut launches.
+        }
 
         // 动态 shortcut「启动快捷应用」：直接跳目标应用（不触发关调试/常驻通知等动作），
         // 故不依赖快捷打开开关，开没开都能用。
@@ -677,6 +690,19 @@ public class MainActivity extends AppCompatActivity {
         refreshAboutSummary();
         // 双模式授权：模式选择 + 授权状态已合并为同一项。点击整行 = 打开模式选择对话框
         authPref = pref("auth");
+        rearRestorePref = pref("restoreRearDisplay");
+        if (rearRestorePref != null) {
+            rearRestorePref.setOnPreferenceClickListener(p -> {
+                rearRestorePref.setEnabled(false);
+                RearDisplayController.restore(this, (ok, error) -> {
+                    if (isDestroyed()) return;
+                    Toast.makeText(this, ok ? getString(R.string.rear_restored)
+                            : getString(R.string.rear_restore_failed, error), Toast.LENGTH_LONG).show();
+                    refresh(DebugController.read(this));
+                });
+                return true;
+            });
+        }
         if (authPref != null) {
             authPref.setOnPreferenceClickListener(p -> {
                 chooseAuthMode();
@@ -945,35 +971,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 执行快捷打开：关闭调试 -> 按开关拉起常驻通知 -> 打开目标应用（写入完成后在回调里依序执行）。
+     * 执行快捷打开：关闭调试、背屏准备、启动目标在同一后台操作中完成。
      *
      * @param autoJump 是否为「开启快捷打开后启动本 App」的自动跳转（决定是否弹跳转提示）
      */
     private void runLinkage(String pkg, boolean autoJump) {
+        Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+        if (launch == null) {
+            handleLinkageTargetGone(pkg);
+            if (!prefsLoaded) showSettings();
+            return;
+        }
         sLinkageLaunched = true; // 任意来源跳转都记一笔：回来时不再自动跳，避免反复弹回
         if (autoJump) {
             sAutoJumped = true; // 区分来源：回设置页时只有自动跳转才提示「启动时已自动跳转」
         }
-        // 联动走统一入口：一键关闭会记住当前组合并把 USB / 无线都关掉。
-        // 常驻通知在 su 写完之后才拉起，天然比旧版的固定 250ms 延时更稳。
-        DebugController.setMaster(this, false, (ok, s) -> {
+        DebugController.quickLaunch(this, pkg, launch, (ok, s, error) -> {
             if (!ok) {
-                // 与 toggleMaster / applyMasterState 同规则：写入失败大概率授权失效，立即置灰并重测
-                privilegedAvailable = false;
-                authCheckedThisSession = false;
-                applyRootState();
-                Toast.makeText(this, R.string.toast_root_fail, Toast.LENGTH_SHORT).show();
-            } else {
-                AdbToggleService.syncCloseNotification(this);
-            }
-            if (!launchApp(pkg)) {
-                // 目标应用已失效（卸载 / 停用）：提示并留在设置页，而不是静默闪回桌面
-                handleLinkageTargetGone(pkg);
-                if (!prefsLoaded) {
-                    showSettings();
-                }
+                Toast.makeText(this, getString(R.string.quick_launch_failed, error), Toast.LENGTH_LONG).show();
+                if (!prefsLoaded) showSettings();
+                refresh(s);
                 return;
             }
+            AdbToggleService.syncCloseNotification(this);
             if (autoJump) {
                 Toast.makeText(this, R.string.linkage_auto_jumped, Toast.LENGTH_LONG).show();
             }
@@ -1053,6 +1073,8 @@ public class MainActivity extends AppCompatActivity {
             // 「检查更新」常驻可见（待激活）：功能未配置时仍可点，提示尚未配置；
             // 比「未上线就藏起来」更符合预期——关于页一眼能看到有此功能，配置好后即生效。
             neutral.setOnClickListener(v -> manualCheckUpdate());
+            neutral.setEnabled(UpdateChecker.isActive());
+            if (!UpdateChecker.isActive()) neutral.setText(R.string.update_disabled_personal);
         });
         dlg.show();
     }
@@ -1072,6 +1094,10 @@ public class MainActivity extends AppCompatActivity {
      * 开发者选项行是独立开关，只反映 development_settings_enabled。
      */
     private void refresh(DebugController.State s) {
+        if (rearRestorePref != null) {
+            rearRestorePref.setVisible(RearDisplayController.hasPending(this));
+            rearRestorePref.setEnabled(privilegedAvailable);
+        }
         if (swMasterPref == null || swUsbPref == null || swWirelessPref == null) {
             return;
         }
@@ -1224,6 +1250,7 @@ public class MainActivity extends AppCompatActivity {
         // 重建要移除/新建所有 Preference，并在主线程同步 getApplicationIcon（跨进程 + 解码），
         // 而 onResume 每次都会走到这里 —— 每次回前台都为一份没变的列表重做一遍纯属浪费。
         String sig = privilegedAvailable + "|" + def + "|" + android.text.TextUtils.join(",", apps);
+        for (String pkg : apps) sig += "|" + pkg + ":" + LinkagePrefs.closesRearDisplay(this, pkg);
         if (sig.equals(lastLinkageSignature)) {
             return;
         }
@@ -1261,7 +1288,7 @@ public class MainActivity extends AppCompatActivity {
         defPref.setIcon(def.isEmpty() ? null : loadAppDrawable(def));
         cat.addPreference(defPref);
 
-        // 2) 每个快捷应用一行：整行点击=快捷打开；长按=创建桌面快捷方式
+        // 2) 每个快捷应用一行：整行点击=快捷打开；长按=应用设置
         for (String pkg : apps) {
             LongClickPreference p = new LongClickPreference(this);
             p.setKey(LINKAGE_APP_KEY_PREFIX + pkg);
@@ -1270,7 +1297,7 @@ public class MainActivity extends AppCompatActivity {
             // 标题只显示应用名；它是否为「默认快捷应用」由上方「默认快捷应用」行统一体现，这里不再重复标注
             p.setTitle(label == null ? pkg : label);
             // 摘要改为操作提示，不再显示包名
-            p.setSummary(R.string.quick_hint);
+            p.setSummary(LinkagePrefs.closesRearDisplay(this, pkg) ? R.string.quick_hint_rear : R.string.quick_hint);
             p.setIcon(loadAppDrawable(pkg));
             p.setOnPreferenceClickListener(pv -> {
                 if (!privilegedAvailable) {
@@ -1285,7 +1312,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, R.string.auth_need_grant, Toast.LENGTH_SHORT).show();
                     return true;
                 }
-                createDesktopShortcutFor(pkg);
+                showQuickAppOptions(pkg);
                 return true;
             });
             cat.addPreference(p);
@@ -1326,6 +1353,32 @@ public class MainActivity extends AppCompatActivity {
             // 选完立刻刷新动态快捷方式（「启动联动应用」现取默认 app）
             ToggleShortcuts.markDirty(this);
         });
+    }
+
+    private void showQuickAppOptions(String pkg) {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        sheet.setContentView(R.layout.sheet_quick_app_options);
+        View content = sheet.findViewById(R.id.quick_options_content);
+        CharSequence label = getApplicationLabel(pkg);
+        ((TextView) content.findViewById(R.id.quick_options_name)).setText(label == null ? pkg : label);
+        androidx.core.view.ViewCompat.setAccessibilityHeading(content.findViewById(R.id.quick_options_name), true);
+        ((android.widget.ImageView) content.findViewById(R.id.quick_options_icon)).setImageDrawable(loadAppDrawable(pkg));
+        androidx.core.view.ViewCompat.setAccessibilityPaneTitle(content, getString(R.string.quick_options_title));
+
+        MaterialSwitch rearSwitch = content.findViewById(R.id.quick_options_rear_switch);
+        rearSwitch.setChecked(LinkagePrefs.closesRearDisplay(this, pkg));
+        rearSwitch.setOnCheckedChangeListener((button, checked) -> {
+            LinkagePrefs.setClosesRearDisplay(this, pkg, checked);
+            rebuildLinkageList();
+        });
+        content.findViewById(R.id.quick_options_shortcut).setOnClickListener(view -> {
+            sheet.dismiss();
+            createDesktopShortcutFor(pkg);
+        });
+        content.findViewById(R.id.quick_options_done).setOnClickListener(view -> sheet.dismiss());
+        sheet.getBehavior().setSkipCollapsed(true);
+        sheet.show();
+        sheet.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
     }
 
     /**
@@ -1410,18 +1463,15 @@ public class MainActivity extends AppCompatActivity {
         return d;
     }
 
-    /** 启动目标应用；返回是否成功拉起（已卸载 / 已停用 / 无启动入口都会失败） */
+    /** The existing launch-only shortcut intentionally leaves device settings unchanged. */
     private boolean launchApp(String pkg) {
         try {
-            Intent i = getPackageManager().getLaunchIntentForPackage(pkg);
-            if (i == null) {
-                return false;
-            }
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(i);
+            Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch == null) return false;
+            startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             return true;
-        } catch (Throwable t) {
-            android.util.Log.w(TAG, "launchApp failed: " + pkg, t);
+        } catch (Exception error) {
+            android.util.Log.w(TAG, "launchApp failed: " + pkg, error);
             return false;
         }
     }

@@ -20,3 +20,6 @@ adbswitch/pgyer.properties
 
 # WorkBuddy 项目工作日志（内部，不入库）
 .workbuddy/
+
+# 本地设计与执行记录
+/docs/superpowers/

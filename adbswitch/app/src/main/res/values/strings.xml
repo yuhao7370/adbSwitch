@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">调试开关</string>
+    <string name="app_name">调试开关·背屏版</string>
     <string name="tile_label">调试开关</string>
 
     <!-- 桌面快捷方式 -->
@@ -56,7 +56,22 @@
     <string name="linkage_apps_empty_toast">请先添加快捷应用</string>
 
     <!-- 快捷应用行提示（替代包名显示）：整行点击=快捷打开；长按=创建桌面快捷方式 -->
-    <string name="quick_hint">点击快捷打开，长按创建快捷方式</string>
+    <string name="quick_hint">点击快捷打开，长按设置</string>
+    <string name="quick_hint_rear">快捷打开时关闭背屏，长按设置</string>
+    <string name="quick_create_shortcut">创建桌面快捷方式</string>
+    <string name="quick_options_title">快捷打开设置</string>
+    <string name="quick_options_done">完成</string>
+    <string name="quick_shortcut_summary">从桌面一键关闭调试并打开此应用</string>
+    <string name="rear_option_title">临时关闭背屏</string>
+    <string name="rear_option_summary">关闭调试后暂停背屏，再打开此应用</string>
+    <string name="rear_option_recovery_hint">用完可在通知或首页恢复背屏。\n重新开启调试时也会自动恢复。</string>
+    <string name="rear_restore_only">仅恢复背屏</string>
+    <string name="rear_restore_summary">先结束本次快捷应用，再恢复背屏；保持调试状态不变</string>
+    <string name="rear_notify_title">背屏暂时关闭</string>
+    <string name="rear_restored">背屏恢复完成</string>
+    <string name="rear_restore_failed">背屏恢复未完成：%1$s</string>
+    <string name="quick_launch_failed">未启动目标应用：%1$s</string>
+    <string name="update_disabled_personal">检查更新已停用</string>
 
     <string name="kill_before_open_title">开启调试自动关闭快捷应用</string>
     <string name="kill_before_open_sum">避免快捷应用在状态翻转瞬间读到调试</string>

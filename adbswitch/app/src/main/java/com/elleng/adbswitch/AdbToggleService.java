@@ -33,6 +33,7 @@ public class AdbToggleService extends Service {
     public static final String ACTION_SETTINGS = "com.elleng.adbswitch.ACTION_SETTINGS";
     /** Live Update「取消置顶」：撤掉常驻通知（不改 adb_enabled 真值） */
     public static final String ACTION_DISMISS = "com.elleng.adbswitch.ACTION_DISMISS";
+    public static final String ACTION_RESTORE_REAR = "com.elleng.adbswitch.ACTION_RESTORE_REAR";
     /** 启动时由调用方告知「当前应为关闭态」，避免在服务里做阻塞 su 读状态导致通知延迟 */
     public static final String EXTRA_STATE_ON = "state_on";
 
@@ -41,7 +42,7 @@ public class AdbToggleService extends Service {
 
     /** 状态变化 listener（替代原进程内广播）：任一开启即撤掉常驻通知，否则刷新为已关闭 */
     private final DebugController.StateListener stateListener = s -> {
-        if (s.anyOn()) {
+        if (s.anyOn() && !RearDisplayController.hasPending(this)) {
             // 任一被打开：adbd 又跑起来了，常驻通知没有意义，撤掉
             ToggleShortcuts.markDirty(AdbToggleService.this);
             stopSelf();
@@ -104,7 +105,7 @@ public class AdbToggleService extends Service {
         } else {
             s = DebugController.read(this);
         }
-        if (s.anyOn()) {
+        if (s.anyOn() && !RearDisplayController.hasPending(this)) {
             // 任一还开着：不需要常驻通知。
             // 但本服务可能经 startForegroundService() 拉起，必须先 startForeground 再停，
             // 否则系统按「没在时限内进前台」抛 ForegroundServiceDidNotStartInTimeException。
@@ -178,7 +179,7 @@ public class AdbToggleService extends Service {
     public static void syncCloseNotification(Context ctx) {
         boolean notifyOnClose = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE)
                 .getBoolean("notify_on_close", true);
-        if (notifyOnClose) {
+        if (notifyOnClose || RearDisplayController.hasPending(ctx)) {
             start(ctx);
         } else {
             stop(ctx);
@@ -195,7 +196,7 @@ public class AdbToggleService extends Service {
      */
     public static void start(Context ctx) {
         Intent i = new Intent(ctx, AdbToggleService.class);
-        i.putExtra(EXTRA_STATE_ON, false);
+        i.putExtra(EXTRA_STATE_ON, DebugController.read(ctx).anyOn());
         try {
             ctx.startForegroundService(i);
         } catch (Throwable t) {
@@ -206,6 +207,10 @@ public class AdbToggleService extends Service {
 
     /** 移除常驻通知（恢复正常时调用）：前台服务与降级直发两种方式都要撤掉 */
     public static void stop(Context ctx) {
+        if (RearDisplayController.hasPending(ctx)) {
+            start(ctx);
+            return;
+        }
         try {
             ctx.stopService(new Intent(ctx, AdbToggleService.class));
         } catch (Throwable ignored) {
@@ -246,6 +251,7 @@ public class AdbToggleService extends Service {
 
     private static Notification buildNotification(Context ctx, DebugController.State s) {
         boolean on = s.anyOn();
+        boolean rear = RearDisplayController.hasPending(ctx);
         Intent open = new Intent(ctx, NotificationReceiver.class).setAction(ACTION_OPEN);
         PendingIntent piOpen = PendingIntent.getBroadcast(ctx, 1, open, PendingIntent.FLAG_IMMUTABLE);
         Intent close = new Intent(ctx, NotificationReceiver.class).setAction(ACTION_CLOSE);
@@ -257,8 +263,9 @@ public class AdbToggleService extends Service {
         // 「ongoing 通知」为前提——前台服务用的是 specialUse 类型不被提升，所以不设 ongoing 时
         // 实际常驻通知只显示为普通通知（不进状态栏胶囊/锁屏）。
         b.setSmallIcon(R.drawable.ic_tile)
-                .setContentTitle(ctx.getString(on ? R.string.notify_title_on : R.string.notify_title_off))
-                .setContentText(describeSubStates(ctx, s))
+                .setContentTitle(ctx.getString(rear ? R.string.rear_notify_title
+                        : on ? R.string.notify_title_on : R.string.notify_title_off))
+                .setContentText(rear ? ctx.getString(R.string.rear_restore_summary) : describeSubStates(ctx, s))
                 .setOngoing(true)
                 .setPriority(Notification.PRIORITY_LOW);
 
@@ -279,6 +286,11 @@ public class AdbToggleService extends Service {
             Log.w(TAG, "promoted ongoing not supported on this API level", t);
         }
 
+        if (rear) {
+            Intent restoreRear = new Intent(ctx, NotificationReceiver.class).setAction(ACTION_RESTORE_REAR);
+            PendingIntent piRear = PendingIntent.getBroadcast(ctx, 5, restoreRear, PendingIntent.FLAG_IMMUTABLE);
+            b.addAction(0, ctx.getString(R.string.rear_restore_only), piRear);
+        }
         if (on) {
             b.addAction(0, ctx.getString(R.string.notify_action_close), piClose);
         } else {
