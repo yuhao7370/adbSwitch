@@ -1,23 +1,11 @@
 <resources>
-    <!-- Material 3 动态（莫奈）主题：
-         parent 用 Dynamic 分支 —— 系统从壁纸提取色调，灌入 colorPrimary/colorSurface/...
-         所有 M3 颜色角色不再写死（已移除覆盖），动态取色才能生效。
-         仅把窗口背景 / 状态栏指向 ?attr/colorSurface（动态 surface），
-         保证状态栏 + 顶栏 + 页面同色，且整体随壁纸变化。
-         顶栏标题 / 副标题字号在 activity_main.xml 的 MaterialToolbar 上显式指定。 -->
-    <style name="AppTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
-        <item name="android:statusBarColor">?attr/colorSurface</item>
+    <!-- The platform window matches miuix while Compose owns every visible component. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#F7F7F7</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowBackground">?attr/colorSurface</item>
-    </style>
-
-    <!-- 顶栏标题：M3 Title Large 基准（22sp），缩小到 18sp -->
-    <style name="AdbToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:textSize">18sp</item>
-    </style>
-
-    <!-- 顶栏副标题：M3 Body Medium 基准（14sp），缩小到 12sp -->
-    <style name="AdbToolbarSubtitle" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:textSize">12sp</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:colorAccent">#3482FF</item>
     </style>
 </resources>

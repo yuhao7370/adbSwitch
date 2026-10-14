@@ -2,6 +2,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // 构建时间戳（epoch millis）：注入 BuildConfig.BUILD_TIME_MS，App 底部格式化显示，
@@ -27,14 +29,15 @@ android {
     // AGP 8 默认不生成 BuildConfig，这里显式开启以便注入构建时间戳
     buildFeatures {
         buildConfig = true
+        compose = true
     }
 
     defaultConfig {
         applicationId = "com.yuhao7370.adbswitch"
         minSdk = 27
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.1.0"
+        versionCode = 11
+        versionName = "1.2.0"
         buildConfigField("long", "BUILD_TIME_MS", "${buildTimeMs}L")
 
         // 蒲公英备通道密钥：从仓库外 pgyer.properties 注入 BuildConfig，避免明文进源码/公开仓库。
@@ -64,9 +67,7 @@ android {
     buildTypes {
         release {
             // 开启 R8 混淆 + 资源压缩。
-            // 本项目零三方依赖、且所有反射都打在 Android framework 类上
-            // （Notification.Builder / NotificationManager 的 Live Updates 相关方法），
-            // bootclasspath 不会被混淆，故无需为反射加 keep。
+            // Android framework 反射不受混淆影响；Compose/miuix 使用依赖提供的 consumer rules。
             isMinifyEnabled = true
             isShrinkResources = true
             if (signingProps.isNotEmpty()) {
@@ -83,36 +84,43 @@ android {
 
     lint {
         checkReleaseBuilds = false
-        abortOnError = false
+        abortOnError = true
     }
 
-    // 统一产物命名：包名-版本名-架构-构建类型（如 com.elleng.adbswitch-1.0.0-universal-release.apk）。
-    // 架构段固定为 universal（本工程单包）；末段构建类型（release/debug）由 variant.name 决定，不写死。
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    // 交付文件名使用应用名，不包含个人标识；独立 applicationId 保持不变。
     applicationVariants.all {
-        val pkg = applicationId
         val ver = versionName
         val type = name
         outputs.all {
             if (this is com.android.build.gradle.internal.api.ApkVariantOutputImpl) {
-                outputFileName = "${pkg}-${ver}-universal-${type}.apk"
+                outputFileName = "AdbSwitch-${ver}-${type}.apk"
             }
         }
     }
+}
+
+kotlin {
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
 }
 
 // 主开关的真实写入走双后端：root（su）或 Shizuku（shell uid 2000）。
 // Shizuku 的三个工件（api / provider / aidl）13.1.5 已在本机 Gradle 缓存，可离线构建。
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    implementation(platform("androidx.compose:compose-bom:2026.03.00"))
+    implementation("androidx.activity:activity-compose:1.12.4")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("top.yukonga.miuix.kmp:miuix-android:0.8.8")
+    implementation("dev.chrisbanes.haze:haze-android:1.7.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("dev.rikka.shizuku:aidl:13.1.5")
-    // 原生底部提示控件 Snackbar（替代手写的悬浮卡片）
-    implementation("com.google.android.material:material:1.12.0")
-    // M3 架构三件套：AppCompatActivity（壳）+ PreferenceFragmentCompat（设置列表）
-    // + Material 组件（MaterialToolbar / MaterialSwitch / MaterialAlertDialog / Snackbar）
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.preference:preference:1.2.1")
-    // 标准下拉刷新控件（替代自研的下拉刷新轮子）；1.1.0 已在本机 Gradle 缓存，可离线构建
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 }

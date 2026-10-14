@@ -1,10 +1,10 @@
 <resources>
-    <!-- 夜间：继承同一 M3 动态主题，颜色角色经 Dynamic 主题按壁纸派生（暗色档）。
-         此处仅把状态栏图标切为浅色（日间覆盖里设了 true）。
-         必须声明与日间相同的 parent，否则夜间会丢失 M3 动态主题继承。 -->
-    <style name="AppTheme" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar">
-        <item name="android:statusBarColor">?attr/colorSurface</item>
-        <item name="android:windowBackground">?attr/colorSurface</item>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">#3482FF</item>
     </style>
 </resources>

@@ -64,7 +64,7 @@
     <string name="quick_shortcut_summary">从桌面一键关闭调试并打开此应用</string>
     <string name="rear_option_title">临时关闭背屏</string>
     <string name="rear_option_summary">关闭调试后暂停背屏，再打开此应用</string>
-    <string name="rear_option_recovery_hint">用完可在通知或首页恢复背屏。\n重新开启调试时也会自动恢复。</string>
+    <string name="rear_option_recovery_hint">用完可在通知或「设置」页恢复背屏。\n重新开启调试时也会自动恢复。</string>
     <string name="rear_restore_only">仅恢复背屏</string>
     <string name="rear_restore_summary">先结束本次快捷应用，再恢复背屏；保持调试状态不变</string>
     <string name="rear_notify_title">背屏暂时关闭</string>
@@ -125,8 +125,6 @@
     <!-- 关于弹窗构建时间行的标签（弹窗改用结构化布局 dialog_about.xml，直接给 TextView 设文本，
          不再使用带 %1$s/%1$d 占位符的字符串，避免占位符未被 String.format 填充而原样显示） -->
     <string name="about_build_time_label">构建时间：</string>
-    <!-- 关于弹窗左下角署名按钮（与右下角「确定」对应）；点击跳转 elleng.eu.org -->
-    <string name="about_credit">@伦Ellen</string>
     <string name="about_info_desc">项目仓库</string>
     <string name="about_open_failed">无法打开链接</string>
 
@@ -195,4 +193,35 @@
     <string name="auth_need_start">请先在 Shizuku 应用中启动服务</string>
     <string name="auth_no_priv">未授权，无法写入调试开关</string>
     <string name="auth_need_grant">请先完成授权（root 或 Shizuku）</string>
+    <string name="miuix_subtitle">背屏版 · USB 与无线调试</string>
+    <string name="debug_details">USB 与无线调试</string>
+    <string name="operation_in_progress">正在处理，请稍候…</string>
+    <string name="auth_checking">正在检查授权…</string>
+    <string name="auth_setup_summary">选择 root 或 Shizuku，完成授权后即可控制调试。</string>
+    <string name="auth_granted_suffix"> 模式 · 已授权</string>
+    <string name="auth_denied_suffix"> 模式 · 未授权</string>
+    <string name="auth_root_description">通过设备的超级用户权限控制调试</string>
+    <string name="auth_shizuku_description">通过已启动的 Shizuku 服务控制调试</string>
+    <string name="about_package_label">应用包名</string>
+    <string name="about_build_label">构建时间</string>
+    <string name="app_options_description">%1$s的快捷打开设置</string>
+    <string name="back">返回</string>
+    <string name="picker_refresh">刷新</string>
+    <string name="picker_selected_count">已选择 %1$d 个应用</string>
+    <string name="picker_save_count">保存（%1$d）</string>
+    <string name="picker_no_results">没有匹配的应用，试试其他名称或包名</string>
+    <string name="quick_apps_page">快捷应用</string>
+    <string name="settings_page">设置</string>
+    <string name="tab_apps">应用</string>
+    <string name="tab_settings">设置</string>
+    <string name="apps_empty_guidance">到「设置」中添加要快捷打开的应用</string>
+    <string name="open_settings_page">前往设置</string>
+    <string name="quick_app_summary">快捷打开</string>
+    <string name="quick_app_summary_rear">快捷打开 · 暂停背屏</string>
+    <string name="debug_auth_section">调试与授权</string>
+    <string name="appearance_section">外观</string>
+    <string name="theme_mode_title">主题模式</string>
+    <string name="theme_follow_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
 </resources>

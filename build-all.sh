@@ -1,7 +1,7 @@
 #!/bin/bash
 # 一键构建：仅构建当前主方案「调试开关 (AdbSwitch)」APK。
 # 产物用 Gradle 默认输出目录与统一命名（包名-版本名-架构-构建类型）：
-#   adbswitch/app/build/outputs/apk/release/com.elleng.adbswitch-<版本>-universal-release.apk
+#   adbswitch/app/build/outputs/apk/release/AdbSwitch-<版本>-release.apk
 # 旧的 Xposed / Zygisk / 探针 方案已归档到 archive/，不再从这里构建。
 set -euo pipefail
 
