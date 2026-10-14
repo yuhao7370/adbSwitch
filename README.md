@@ -120,9 +120,19 @@ A：重新开启调试前先 `am force-stop` 目标应用，可避免它在调�
 
 本 App 无任何遥测与数据上传；唯一的网络请求是「检查更新」（访问 GitHub Release 元数据与蒲公英通道），且可在不联网的情况下正常使用全部功能。
 
+## 🎨 图标与参考声明
+
+本 fork 的图标参考了 **[@甶丶](https://www.bilibili.com/opus/1242097128919007239) 的 MiMo 娘同人形象**（虽然这东西跟 MiMo 只有小米的关系）。
+
+图标绘制风格参考 [SukiSU Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 的简洁 Q 版表情包图标，保留疑惑表情、抵下巴动作、蓝白滑动开关和问号，并增加四周留白；人物仍为上述 MiMo 娘同人形象。
+
+参考作品为 [《MiMo娘立绘 · 01》](https://xn--pssy23gqgbz2d718b.com/works/mimo202609230001.html) 与 [《MiMo娘立绘 · 02》设定图](https://xn--pssy23gqgbz2d718b.com/works/mimo202609230002.html)，由「蓝色大肥鱼」整理收录。整理页标注原作品采用 **CC BY-NC（署名·非商用）**；原作品权利与署名归原作者所有。感谢原作者及整理者提供参考。
+
+该图标为本项目使用的同人衍生图，不代表小米或 MiMo 官方形象。
+
 ## 📄 许可证
 
-本项目以 [GPL-3.0](LICENSE) 许可证开源。
+本项目代码以 [GPL-3.0](LICENSE) 许可证开源；图标参考作品的权利与许可说明见上文。
 
 <p align="center">
   Made with ❤️ on Android by <a href="https://github.com/gaoyilun">@gaoyilun</a>

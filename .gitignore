@@ -23,3 +23,10 @@ adbswitch/pgyer.properties
 
 # 本地设计与执行记录
 /docs/superpowers/
+
+# 图标目录只保留正式源图与导出图；参考、候选、截图和开发记录留在本地
+/icon-review/*
+!/icon-review/ic_launcher_source.png
+!/icon-review/ic_launcher_1024.png
+!/icon-review/ic_launcher_512.png
+!/icon-review/ic_launcher_preview.png
